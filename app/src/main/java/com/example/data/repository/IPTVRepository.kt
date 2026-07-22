@@ -720,15 +720,44 @@ class IPTVRepository(private val context: Context) {
                 groupUpper.contains("CINEMA") ||
                 groupUpper.contains("LANÇAMENTOS") ||
                 groupUpper.contains("ANIMACAO") ||
-                groupUpper.contains("DOCUMENTARIOS") ||
-                groupUpper.contains("TELECINE")
+                groupUpper.contains("DOCUMENTARIOS")
         )
 
-        val isVideoFile = urlUpper.contains(".MP4") || urlUpper.contains(".MKV") || urlUpper.contains(".TS") || urlUpper.contains(".AVI") || urlUpper.contains(".M4V")
+        val isVodFile = urlUpper.contains(".MP4") || urlUpper.contains(".MKV") || urlUpper.contains(".AVI") || urlUpper.contains(".M4V") || urlUpper.contains(".FLV") || urlUpper.contains(".WEBM") || urlUpper.contains(".MOV")
+        val isLiveStream = urlUpper.contains(".M3U8") || urlUpper.contains("/LIVE/")
+        val isSeriesPath = urlUpper.contains("/SERIES/") || urlUpper.contains("/SERIE/") || urlUpper.contains("/EPISODES/") || urlUpper.contains("/EPISODE/")
+        val isMoviePath = urlUpper.contains("/MOVIE/") || urlUpper.contains("/MOVIES/")
+
+        val isLiveGroup = groupUpper.contains("CANAIS") ||
+                groupUpper.contains("CANAL") ||
+                groupUpper.contains("LIVE") ||
+                groupUpper.contains("TV") ||
+                groupUpper.contains("AO VIVO") ||
+                groupUpper.contains("TELEVISÃO") ||
+                groupUpper.contains("TELEVISAO") ||
+                groupUpper.contains("NOTICIAS") ||
+                groupUpper.contains("ESPORTES") ||
+                groupUpper.contains("NEWS") ||
+                groupUpper.contains("SPORTS") ||
+                groupUpper.contains("24/7") ||
+                groupUpper.contains("24H") ||
+                groupUpper.contains("24 HORAS") ||
+                groupUpper.contains("RADIOS") ||
+                groupUpper.contains("RÁDIOS") ||
+                groupUpper.contains("EPG") ||
+                groupUpper.contains("PREMIERE") ||
+                groupUpper.contains("TELECINE") ||
+                groupUpper.contains("HBO") ||
+                groupUpper.contains("GLOBOPLAY") ||
+                groupUpper.contains("BBB") ||
+                groupUpper.contains("DAZN") ||
+                groupUpper.contains("ESPN") ||
+                groupUpper.contains("COMBATE") ||
+                groupUpper.contains("SPORTV")
 
         val type = when {
-            hasSeriesIndicator && isVideoFile -> "series_episode"
-            (hasMovieIndicator || isVideoFile) -> "movie"
+            isSeriesPath -> if (isVodFile) "series_episode" else "series"
+            (isMoviePath || (isVodFile && !isLiveStream && !isLiveGroup)) -> "movie"
             else -> "live"
         }
 
@@ -736,7 +765,7 @@ class IPTVRepository(private val context: Context) {
         val finalId = when (type) {
             "movie" -> extractedId ?: 0
             "series", "series_episode" -> if (extractedId != null) extractedId + 10000000 else 0
-            "live" -> if (extractedId != null) extractedId + 20000000 else 0
+            "live" -> 0
             else -> 0
         }
 
@@ -1363,6 +1392,20 @@ class IPTVRepository(private val context: Context) {
             fetchRealtimeTMDBContent()
         } catch (e: Exception) {
             Log.e("IPTVRepository", "Error performing real-time TMDB content refresh", e)
+        }
+
+        try {
+            fixLiveChannelTypesInDatabase()
+        } catch (e: Exception) {
+            Log.e("IPTVRepository", "Error fixing live channel types", e)
+        }
+    }
+
+    suspend fun fixLiveChannelTypesInDatabase() = withContext(Dispatchers.IO) {
+        try {
+            playlistDao.fixLiveChannelTypes()
+        } catch (e: Exception) {
+            Log.e("IPTVRepository", "Error fixing live channel types in DB", e)
         }
     }
 

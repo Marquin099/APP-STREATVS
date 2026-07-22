@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -68,6 +70,19 @@ fun LoginScreen(
     var userFocused by remember { mutableStateOf(false) }
     var passFocused by remember { mutableStateOf(false) }
     var loginFocused by remember { mutableStateOf(false) }
+
+    val scrollState = rememberScrollState()
+
+    // Smoothly scroll form when focused so keyboard never covers input fields
+    LaunchedEffect(userFocused, passFocused, loginFocused) {
+        if (userFocused) {
+            delay(100)
+            scrollState.animateScrollTo(0)
+        } else if (passFocused || loginFocused) {
+            delay(100)
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
 
     // Focus requesters for explicit D-pad Arrow Key flow (up/down)
     val userFocusRequester = remember { FocusRequester() }
@@ -146,7 +161,8 @@ fun LoginScreen(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 24.dp),
+                .padding(horizontal = 48.dp, vertical = 16.dp)
+                .imePadding(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -154,7 +170,8 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .width(360.dp)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -166,21 +183,21 @@ fun LoginScreen(
                     Text(
                         text = "StreaTV",
                         color = Color.White,
-                        fontSize = 44.sp,
+                        fontSize = 40.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = (-1.5).sp
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Sua TV em qualquer lugar",
                         color = Color.White.copy(alpha = 0.45f),
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.2.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Username Input - styled as a white pill with dropdown icon on the right
                 OutlinedTextField(

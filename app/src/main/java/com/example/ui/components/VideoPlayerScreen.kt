@@ -59,6 +59,15 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val selectedProfile by viewModel.selectedProfile.collectAsState()
 
+    // Keep TV screen awake during video playback (prevents ambient mode/screen saver)
+    val activity = context as? android.app.Activity
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     // Initialize VlcPlayerManager
     val vlcPlayerManager = remember {
         VlcPlayerManager(context)

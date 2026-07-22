@@ -140,34 +140,22 @@ class IPTVViewModel(application: Application) : AndroidViewModel(application) {
         .map { list ->
             list.filter { item ->
                 val urlLower = item.url.lowercase().trim()
-                val isVod = urlLower.endsWith(".mp4") || urlLower.contains(".mp4?") || urlLower.contains(".mp4/") ||
-                        urlLower.endsWith(".mkv") || urlLower.contains(".mkv?") || urlLower.contains(".mkv/") ||
-                        urlLower.endsWith(".avi") || urlLower.contains(".avi?") ||
-                        urlLower.endsWith(".mov") || urlLower.contains(".mov?") ||
-                        urlLower.endsWith(".wmv") || urlLower.contains(".wmv?") ||
-                        urlLower.endsWith(".mpg") || urlLower.contains(".mpg?") ||
-                        urlLower.endsWith(".mpeg") || urlLower.contains(".mpeg?") ||
-                        urlLower.endsWith(".m4v") || urlLower.contains(".m4v?") ||
-                        urlLower.endsWith(".webm") || urlLower.contains(".webm?") ||
-                        urlLower.endsWith(".flv") || urlLower.contains(".flv?") ||
-                        urlLower.endsWith(".f4v") || urlLower.contains(".f4v?") ||
-                        urlLower.endsWith(".mp3") || urlLower.contains(".mp3?")
+                val isVodExtension = urlLower.contains(".mp4") ||
+                        urlLower.contains(".mkv") ||
+                        urlLower.contains(".avi") ||
+                        urlLower.contains(".mov") ||
+                        urlLower.contains(".wmv") ||
+                        urlLower.contains(".mpg") ||
+                        urlLower.contains(".mpeg") ||
+                        urlLower.contains(".m4v") ||
+                        urlLower.contains(".webm") ||
+                        urlLower.contains(".flv") ||
+                        urlLower.contains(".f4v") ||
+                        urlLower.contains(".mp3") ||
+                        urlLower.contains("/movie/") ||
+                        urlLower.contains("/series/")
 
-                val groupLower = (item.groupName ?: "").lowercase().trim()
-                val isVodGroup = groupLower.contains("filme") ||
-                        groupLower.contains("series") ||
-                        groupLower.contains("séries") ||
-                        groupLower.contains("movie") ||
-                        groupLower.contains("vod") ||
-                        groupLower.contains("cinema") ||
-                        groupLower.contains("lançamento") ||
-                        groupLower.contains("desenho") ||
-                        groupLower.contains("documentário") ||
-                        groupLower.contains("animac") ||
-                        groupLower.contains("anime") ||
-                        groupLower.contains("novelas")
-
-                !isVod && !isVodGroup
+                !isVodExtension
             }
         }
         .flowOn(Dispatchers.Default)

@@ -102,19 +102,9 @@ fun DetailScreen(
     LaunchedEffect(isLoadingMetadata) {
         if (!isLoadingMetadata) {
             delay(150) // Allow layout to settle and items to render
-            if (item.type != "series") {
-                try {
-                    playFocusRequester.requestFocus()
-                } catch (e: Exception) {
-                    try {
-                        backFocusRequester.requestFocus()
-                    } catch (e2: Exception) {}
-                }
-            } else {
-                try {
-                    backFocusRequester.requestFocus()
-                } catch (e: Exception) {}
-            }
+            try {
+                backFocusRequester.requestFocus()
+            } catch (e: Exception) {}
         }
     }
 
@@ -359,15 +349,243 @@ fun DetailScreen(
         )
 
         // 3. Main Content
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp)
-        ) {
-            // BACK BUTTON & MUTE BUTTON above the movie title
-            item {
+        if (item.type == "series") {
+            // Series Layout: Top header is 100% static, bottom area contains Episode & Season lists
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                // BACK BUTTON & MUTE BUTTON (Top Header Row)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BackButton(modifier = Modifier.focusRequester(backFocusRequester), onClick = onBack)
+
+                    if (isVideoReady) {
+                        MuteButton(
+                            isMuted = isMuted,
+                            onClick = {
+                                isMuted = !isMuted
+                                vlcPlayerManager.setMute(isMuted)
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Title + Synopsis Compact Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (!item.titleLogoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = item.titleLogoUrl,
+                                contentDescription = item.title,
+                                modifier = Modifier
+                                    .height(65.dp)
+                                    .wrapContentWidth()
+                                    .align(Alignment.Start),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            Text(
+                                text = item.title,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            item.year?.let {
+                                Text(text = it, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+                            }
+                            item.rating?.let {
+                                Text(text = "⭐ $it", color = Color(0xFFF7BD15), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            item.genre?.let {
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(text = it, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = item.description ?: "Nenhuma sinopse disponível para este título.",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Split content layout: Left = Episodes, Right = Season Selector (Filling remaining screen space)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    // LEFT PANEL: Episodes (weighted 0.65f)
+                    Column(
+                        modifier = Modifier
+                            .weight(0.65f)
+                            .fillMaxHeight()
+                    ) {
+                        Text(
+                            text = "EPISÓDIOS (${currentSeason?.episodes?.size ?: 0})",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (currentSeason != null && currentSeason.episodes.isNotEmpty()) {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    itemsIndexed(currentSeason.episodes) { index, ep ->
+                                        EpisodeItemRow(
+                                            episode = ep,
+                                            episodeNumber = index + 1,
+                                            onClick = {
+                                                if (ep.isReleased) {
+                                                    val episodeTitle = "S${String.format("%02d", selectedSeasonIndex + 1)}E${String.format("%02d", index + 1)}: ${ep.title}"
+                                                    val seasonName = currentSeason?.name ?: "Temporada ${selectedSeasonIndex + 1}"
+                                                    coroutineScope.launch {
+                                                        if (!ep.playUrl.isNullOrBlank()) {
+                                                            viewModel.saveLastWatchedEpisode(item.id, episodeTitle, ep.playUrl)
+                                                            viewModel.navigateTo(
+                                                                Screen.Player(
+                                                                    item.copy(
+                                                                        title = "${item.title} - $episodeTitle",
+                                                                        url = ep.playUrl
+                                                                    )
+                                                                )
+                                                            )
+                                                        } else {
+                                                            val realItem = viewModel.findRealEpisodeItem(item.title, seasonName, index, ep.title)
+                                                            if (realItem != null) {
+                                                                viewModel.saveLastWatchedEpisode(item.id, episodeTitle, realItem.url)
+                                                                viewModel.navigateTo(
+                                                                    Screen.Player(
+                                                                        realItem.copy(
+                                                                            title = "${item.title} - $episodeTitle"
+                                                                        )
+                                                                    )
+                                                                )
+                                                            } else {
+                                                                val realSeries = viewModel.verifyAndGetRealPlaylistItem(item)
+                                                                if (realSeries != null) {
+                                                                    viewModel.saveLastWatchedEpisode(item.id, episodeTitle, realSeries.url)
+                                                                    viewModel.navigateTo(
+                                                                        Screen.Player(
+                                                                            item.copy(
+                                                                                title = "${item.title} - $episodeTitle",
+                                                                                url = realSeries.url
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                } else {
+                                                                    Toast.makeText(context, "Espere o Lançamento ainda nao disponivel", Toast.LENGTH_LONG).show()
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Este episódio estará disponível em ${ep.releaseDate}. Aguarde o lançamento!",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Nenhum episódio cadastrado nesta temporada.",
+                                        color = Color.White.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // RIGHT PANEL: Season List (weighted 0.35f)
+                    Column(
+                        modifier = Modifier
+                            .weight(0.35f)
+                            .fillMaxHeight()
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            text = "TEMPORADAS",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            itemsIndexed(seasons) { idx, season ->
+                                SeasonSelectorItem(
+                                    name = season.name,
+                                    isSelected = idx == selectedSeasonIndex,
+                                    onClick = { selectedSeasonIndex = idx }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Movie Layout: Non-scrolling single screen structure where Back button stays firmly visible at top
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // BACK BUTTON & MUTE BUTTON
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -386,10 +604,8 @@ fun DetailScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-            }
 
-            // HEADER INFO SECTION
-            item {
+                // HEADER INFO SECTION
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Bottom
@@ -399,13 +615,12 @@ fun DetailScreen(
                             .weight(1f)
                             .padding(end = 24.dp)
                     ) {
-                        // Title Logo or stylized text
                         if (!item.titleLogoUrl.isNullOrEmpty()) {
                             AsyncImage(
                                 model = item.titleLogoUrl,
                                 contentDescription = item.title,
                                 modifier = Modifier
-                                    .height(90.dp)
+                                    .height(85.dp)
                                     .wrapContentWidth()
                                     .align(Alignment.Start),
                                 contentScale = ContentScale.Fit
@@ -413,115 +628,87 @@ fun DetailScreen(
                         } else {
                             Text(
                                 text = item.title,
-                                fontSize = 38.sp,
+                                fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        // Metadata line
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             item.year?.let {
-                                Text(
-                                    text = it,
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 14.sp
-                                )
+                                Text(text = it, color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
                             }
-
-                            // Classification/Rating
                             item.rating?.let {
-                                Text(
-                                    text = "⭐ $it",
-                                    color = Color(0xFFF7BD15),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
+                                Text(text = "⭐ $it", color = Color(0xFFF7BD15), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
-
-                            // Genre Badge
                             item.genre?.let {
                                 Box(
                                     modifier = Modifier
                                         .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                                         .padding(horizontal = 8.dp, vertical = 3.dp)
                                 ) {
-                                    Text(
-                                        text = it,
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text(text = it, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        // Synopsis / Description
                         Text(
                             text = item.description ?: "Nenhuma sinopse disponível para este título.",
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 15.sp,
-                            lineHeight = 22.sp,
-                            maxLines = 5,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 4,
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        if (item.type != "series") {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                WatchNowButton(
-                                    modifier = Modifier.focusRequester(playFocusRequester),
-                                    onClick = { playContent() }
-                                )
-                            }
-                        }
-                    }
-
-                    // Backdrop side thumbnail (for movies mostly) or decorative poster
-                    if (item.type == "movie") {
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                            modifier = Modifier
-                                .width(180.dp)
-                                .height(270.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AsyncImage(
-                                model = item.logoUrl ?: item.backdropUrl,
-                                contentDescription = "Poster",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            WatchNowButton(
+                                modifier = Modifier.focusRequester(playFocusRequester),
+                                onClick = { playContent() }
                             )
                         }
                     }
-                }
-            }
 
-            // MOVIE-SPECIFIC SECTION: CAST
-            if (item.type == "movie") {
-                item {
-                    Spacer(modifier = Modifier.height(36.dp))
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                        modifier = Modifier
+                            .width(170.dp)
+                            .height(255.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    ) {
+                        AsyncImage(
+                            model = item.logoUrl ?: item.backdropUrl,
+                            contentDescription = "Poster",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                if (castList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(28.dp))
                     Text(
                         text = "ELENCO PRINCIPAL",
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -529,147 +716,6 @@ fun DetailScreen(
                     ) {
                         items(castList) { cast ->
                             CastMemberCard(cast)
-                        }
-                    }
-                }
-            }
-
-            // SERIES-SPECIFIC SECTION: SEASONS (RIGHT SIDE) & EPISODES (LEFT SIDE)
-            if (item.type == "series") {
-                item {
-                    Spacer(modifier = Modifier.height(36.dp))
-
-                    // Split content layout: Left = Episodes, Right = Season Selector
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 400.dp, max = 800.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        // LEFT PANEL: Episodes (weighted 0.65f)
-                        Column(
-                            modifier = Modifier
-                                .weight(0.65f)
-                                .fillMaxHeight()
-                        ) {
-                            Text(
-                                text = "EPISÓDIOS (${currentSeason?.episodes?.size ?: 0})",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Box(modifier = Modifier.weight(1f)) {
-                                if (currentSeason != null && currentSeason.episodes.isNotEmpty()) {
-                                    LazyColumn(
-                                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        itemsIndexed(currentSeason.episodes) { index, ep ->
-                                            EpisodeItemRow(
-                                                episode = ep,
-                                                episodeNumber = index + 1,
-                                                onClick = {
-                                                    if (ep.isReleased) {
-                                                        val episodeTitle = "S${String.format("%02d", selectedSeasonIndex + 1)}E${String.format("%02d", index + 1)}: ${ep.title}"
-                                                        val seasonName = currentSeason?.name ?: "Temporada ${selectedSeasonIndex + 1}"
-                                                        coroutineScope.launch {
-                                                            if (!ep.playUrl.isNullOrBlank()) {
-                                                                viewModel.saveLastWatchedEpisode(item.id, episodeTitle, ep.playUrl)
-                                                                viewModel.navigateTo(
-                                                                    Screen.Player(
-                                                                        item.copy(
-                                                                            title = "${item.title} - $episodeTitle",
-                                                                            url = ep.playUrl
-                                                                        )
-                                                                    )
-                                                                )
-                                                            } else {
-                                                                val realItem = viewModel.findRealEpisodeItem(item.title, seasonName, index, ep.title)
-                                                                if (realItem != null) {
-                                                                    viewModel.saveLastWatchedEpisode(item.id, episodeTitle, realItem.url)
-                                                                    viewModel.navigateTo(
-                                                                        Screen.Player(
-                                                                            realItem.copy(
-                                                                                title = "${item.title} - $episodeTitle"
-                                                                            )
-                                                                        )
-                                                                    )
-                                                                } else {
-                                                                    val realSeries = viewModel.verifyAndGetRealPlaylistItem(item)
-                                                                    if (realSeries != null) {
-                                                                        viewModel.saveLastWatchedEpisode(item.id, episodeTitle, realSeries.url)
-                                                                        viewModel.navigateTo(
-                                                                            Screen.Player(
-                                                                                item.copy(
-                                                                                    title = "${item.title} - $episodeTitle",
-                                                                                    url = realSeries.url
-                                                                                )
-                                                                            )
-                                                                        )
-                                                                    } else {
-                                                                        Toast.makeText(context, "Espere o Lançamento ainda nao disponivel", Toast.LENGTH_LONG).show()
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Este episódio estará disponível em ${ep.releaseDate}. Aguarde o lançamento!",
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Nenhum episódio cadastrado nesta temporada.",
-                                            color = Color.White.copy(alpha = 0.5f)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // RIGHT PANEL: Season List (weighted 0.35f)
-                        Column(
-                            modifier = Modifier
-                                .weight(0.35f)
-                                .fillMaxHeight()
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = "TEMPORADAS",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                itemsIndexed(seasons) { idx, season ->
-                                    SeasonSelectorItem(
-                                        name = season.name,
-                                        isSelected = idx == selectedSeasonIndex,
-                                        onClick = { selectedSeasonIndex = idx }
-                                    )
-                                }
-                            }
                         }
                     }
                 }

@@ -105,4 +105,20 @@ interface PlaylistItemDao {
             CASE WHEN :type = 'live' THEN id ELSE -id END ASC
     """)
     fun getItemsByTypeAndCategory(type: String, groupName: String): Flow<List<PlaylistItem>>
+
+    @Query("""
+        UPDATE playlist_items 
+        SET type = 'live' 
+        WHERE type = 'movie' 
+          AND url NOT LIKE '%.mp4%' 
+          AND url NOT LIKE '%.mkv%' 
+          AND url NOT LIKE '%.avi%' 
+          AND url NOT LIKE '%.m4v%' 
+          AND url NOT LIKE '%.mov%' 
+          AND url NOT LIKE '%.flv%' 
+          AND url NOT LIKE '%.webm%' 
+          AND url NOT LIKE '%/movie/%' 
+          AND url NOT LIKE '%/series/%'
+    """)
+    suspend fun fixLiveChannelTypes()
 }

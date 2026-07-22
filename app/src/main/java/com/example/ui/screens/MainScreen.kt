@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import android.graphics.Bitmap
@@ -509,20 +510,27 @@ fun MainScreen(
                                     ) {
                                         // Cinematic dynamic banner at the top of Movies and Series screens
                                         if (targetState == "Filmes" || targetState == "Series") {
-                                            Spacer(modifier = Modifier.height(24.dp))
                                             val bannerItem = activeFocusedItem ?: itemsSource.firstOrNull()
                                             bannerItem?.let { bItem ->
-                                                val calculatedBannerHeight = (screenMaxHeight - 140.dp).coerceIn(280.dp, 460.dp)
-                                                FeaturedHeroBanner(
-                                                    item = bItem,
-                                                    onNext = { /* No auto rotation needed */ }, viewModel = viewModel,
-                                                    onPrev = { /* No auto rotation needed */ },
-                                                    onClick = { onItemPlayOrDetail(bItem) },
-                                                    onDownPressed = { contentFocusRequester.requestFocus() },
-                                                    onUpPressed = { navBarFocusRequester.requestFocus() },
-                                                    bannerHeight = calculatedBannerHeight,
-                                                    modifier = Modifier.padding(bottom = 16.dp)
-                                                )
+                                                val calculatedBannerHeight = (screenMaxHeight * 0.48f).coerceIn(310.dp, 390.dp)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 24.dp)
+                                                        .padding(top = 8.dp, bottom = 8.dp)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                ) {
+                                                    FeaturedHeroBanner(
+                                                        item = bItem,
+                                                        onNext = { /* No auto rotation needed */ }, viewModel = viewModel,
+                                                        onPrev = { /* No auto rotation needed */ },
+                                                        onClick = { onItemPlayOrDetail(bItem) },
+                                                        onDownPressed = { contentFocusRequester.requestFocus() },
+                                                        onUpPressed = { navBarFocusRequester.requestFocus() },
+                                                        bannerHeight = calculatedBannerHeight,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
                                             }
                                         }
 
@@ -531,6 +539,7 @@ fun MainScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 24.dp)
+                                                .padding(bottom = 48.dp)
                                                 .onPreviewKeyEvent { keyEvent ->
                                                     if (keyEvent.type == KeyEventType.KeyDown) {
                                                         when (keyEvent.key) {
@@ -1048,11 +1057,10 @@ fun FeaturedHeroBanner(
     LaunchedEffect(isBannerFocused) {
         if (isBannerFocused) {
             try {
-                val topOffset = with(localDensity) { -120.dp.toPx() } // Safe negative offset to leave 72.dp of space + extra padding for top bar integration
                 bringIntoViewRequester.bringIntoView(
                     androidx.compose.ui.geometry.Rect(
                         left = 0f,
-                        top = topOffset,
+                        top = 0f,
                         right = 0f,
                         bottom = 0f
                     )
@@ -1100,11 +1108,10 @@ fun FeaturedHeroBanner(
                 if (it.isFocused) {
                     coroutineScope.launch {
                         try {
-                            val topOffset = with(localDensity) { -120.dp.toPx() }
                             bringIntoViewRequester.bringIntoView(
                                 androidx.compose.ui.geometry.Rect(
                                     left = 0f,
-                                    top = topOffset,
+                                    top = 0f,
                                     right = 0f,
                                     bottom = 0f
                                 )
@@ -1581,23 +1588,25 @@ fun FeaturedHeroBanner(
                                         blurRadius = 3f
                                     )
                                 ),
-                                modifier = Modifier.padding(bottom = 12.dp)
+                                modifier = Modifier.padding(bottom = 6.dp)
                             )
                         }
 
                         // Description Synopsis
                         Text(
                             text = currentItem.description ?: "Assista ao vivo aos canais do seu servidor StreaTV IPTV, com reprodução instantânea e guias de programação integrados.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.LightGray,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 18.sp
+                            style = TextStyle(
+                                color = Color.LightGray,
+                                fontSize = 13.sp,
+                                lineHeight = 17.sp
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
 
                         // 4. Aviso de Lançamento / Nova Temporada LOGO ABAIXO da descrição (Sinopse)
                         if (currentItem.type == "series" && currentItem.hasNewSeasonRelease()) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "N O V A   T E M P O R A D A   D I S P O N Í V E L",
                                 style = TextStyle(
@@ -1613,6 +1622,8 @@ fun FeaturedHeroBanner(
                                 )
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -2027,10 +2038,10 @@ fun NetflixSearchScreen(
                 // "Todas as Categorias" option in the vertical list
                 val isAllSelected = selectedCategory == null
                 var isAllFocused by remember { mutableStateOf(false) }
-                val targetAllScale = if (isAllFocused) 1.06f else 1.00f
+                val targetAllScale = if (isAllFocused) 1.04f else 1.00f
                 val allScale by animateFloatAsState(
                     targetValue = targetAllScale,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                    animationSpec = tween(150, easing = LinearOutSlowInEasing),
                     label = "allCategoryScale"
                 )
                 Box(
@@ -2084,10 +2095,10 @@ fun NetflixSearchScreen(
                     val categoryIndex = listIdx + 1
                     val isSelected = selectedCategory == categoryName
                     var isCatFocused by remember { mutableStateOf(false) }
-                    val targetScale = if (isCatFocused) 1.06f else 1.00f
+                    val targetScale = if (isCatFocused) 1.04f else 1.00f
                     val catScale by animateFloatAsState(
                         targetValue = targetScale,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                        animationSpec = tween(150, easing = LinearOutSlowInEasing),
                         label = "categoryScale"
                     )
                     val label = when (categoryName) {
@@ -2220,7 +2231,7 @@ fun NetflixSearchScreen(
                     }
                 }
             } else {
-                items(filteredItems) { item ->
+                items(filteredItems, key = { it.id }) { item ->
                     SearchPosterCard(
                         item = item,
                         onClick = { onPlay(item) },
@@ -2247,34 +2258,9 @@ fun SearchPosterCard(
     var isFocused by remember { mutableStateOf(false) }
     val cardScale by animateFloatAsState(
         targetValue = if (isFocused) 1.05f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        animationSpec = tween(150, easing = LinearOutSlowInEasing),
         label = "searchPosterScale"
     )
-    var isLandscape by remember(item.id) { mutableStateOf(false) }
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val localDensity = androidx.compose.ui.platform.LocalDensity.current
-    var cardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
-
-    LaunchedEffect(isFocused, cardSize) {
-        if (isFocused && cardSize.height > 0) {
-            try {
-                val extraPadding = with(localDensity) { 24.dp.toPx() }
-                bringIntoViewRequester.bringIntoView(
-                    androidx.compose.ui.geometry.Rect(
-                        left = -extraPadding,
-                        top = -extraPadding,
-                        right = cardSize.width.toFloat() + extraPadding,
-                        bottom = cardSize.height.toFloat() + extraPadding
-                    )
-                )
-            } catch (e: Exception) {
-                // ignore
-            }
-        }
-    }
 
     LaunchedEffect(Unit) {
         if (viewModel != null && viewModel.lastClickedItemId == item.id) {
@@ -2299,22 +2285,9 @@ fun SearchPosterCard(
         }
     }
 
-    LaunchedEffect(isFocused) {
-        if (viewModel != null) {
-            if (isFocused && viewModel.lastClickedItemId == item.id) {
-                viewModel.lastClickedItemId = null
-            }
-            if (isFocused && item.type != "live") {
-                viewModel.enrichItemOnDemand(item)
-            }
-        }
-    }
-
     Box(
         modifier = modifier
             .zIndex(if (isFocused) 10f else 1f)
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .onSizeChanged { cardSize = it }
             .focusRequester(localFocusRequester)
             .onFocusChanged { isFocused = it.isFocused }
             .graphicsLayer {
@@ -2351,46 +2324,14 @@ fun SearchPosterCard(
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .build(),
                     contentDescription = item.title,
-                    contentScale = if (isLandscape) ContentScale.Fit else ContentScale.Crop,
+                    contentScale = ContentScale.Crop,
                     onState = { state ->
-                        if (state is AsyncImagePainter.State.Success) {
-                            val drawable = state.result.drawable
-                            isLandscape = drawable.intrinsicWidth > drawable.intrinsicHeight
-                            isLoadFailed = false
-                        } else if (state is AsyncImagePainter.State.Error) {
+                        if (state is AsyncImagePainter.State.Error) {
                             isLoadFailed = true
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-
-                if (isLandscape) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(55.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f))
-                                )
-                            )
-                    )
-                    Text(
-                        text = item.title,
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 6.dp, vertical = 6.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 11.sp
-                    )
-                }
             } else {
                 Box(
                     modifier = Modifier
